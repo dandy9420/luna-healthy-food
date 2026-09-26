@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = "index.html";
 const tag = '<script src="/luna-overrides.js"></script>';
+const flow = fs.readFileSync("luna-order-flow.js", "utf8");
 let html = fs.readFileSync(path, "utf8");
 
 // Remove Wellness Journal at build time.
