@@ -17,6 +17,19 @@
 @media (min-width:768px){
   #wellness-carousel>*{flex-basis:calc((100% - 32px)/3)!important;width:calc((100% - 32px)/3)!important;min-height:420px!important;height:420px!important}
 }';document.head.appendChild(s);}
+
+  function removeWellnessJournal(){
+    const headings=[...document.querySelectorAll('h1,h2,h3,h4')];
+    const heading=headings.find(el=>el.textContent.trim()==='Luna Wellness Journal');
+    if(!heading) return;
+    let section=heading.closest('section');
+    if(!section){
+      section=heading.parentElement;
+      while(section && section.parentElement && section.parentElement.children.length<=2) section=section.parentElement;
+    }
+    if(section) section.remove();
+  }
+
   function apply(){compactDeliveryOnly();addStyles();translateText();addCarouselControls('review-carousel','review-dots-override');addCarouselControls('wellness-carousel','wellness-dots-override');const sel=document.getElementById('language-select');if(sel){sel.value=state.lang;sel.onchange=()=>{state.lang=sel.value;localStorage.setItem('luna-language',state.lang);location.reload();};}document.querySelectorAll('.ph-tag').forEach(e=>{if(/Product image/i.test(e.textContent))e.textContent='Photo pending';});}
   const wrap=name=>{const orig=window[name];if(typeof orig!=='function'||orig.__lunaWrapped)return;const f=function(){const r=orig.apply(this,arguments);setTimeout(apply,0);return r};f.__lunaWrapped=true;window[name]=f;};
   window.addEventListener('DOMContentLoaded',()=>{apply();['renderHome','renderMenuGrid','renderCart','renderPromos','renderWellnessAndReviews'].forEach(wrap);setTimeout(apply,100);});setTimeout(apply,300);
