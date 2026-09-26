@@ -31,7 +31,9 @@ html = html.replace(
 html = html.replace(/<div id="delivery-field">/, '<div id="delivery-field" style="display:none !important;">');
 
 if (!html.includes(tag)) {
-  html = html.replace("</body>", tag + "\n</body>");
+  html = html.replace("</body>", tag + "\n" + flow + "\n</body>");
+} else if (!html.includes(flow)) {
+  html = html.replace(tag, tag + "\n" + flow);
 }
 
 fs.writeFileSync(path, html);
