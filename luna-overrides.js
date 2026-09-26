@@ -9,4 +9,142 @@
   function apply(){compactDeliveryOnly();addStyles();translateText();addCarouselControls('review-carousel','review-dots-override');addCarouselControls('wellness-carousel','wellness-dots-override');const sel=document.getElementById('language-select');if(sel){sel.value=state.lang;sel.onchange=()=>{state.lang=sel.value;localStorage.setItem('luna-language',state.lang);location.reload();};}document.querySelectorAll('.ph-tag').forEach(e=>{if(/Product image/i.test(e.textContent))e.textContent='Photo pending';});}
   const wrap=name=>{const orig=window[name];if(typeof orig!=='function'||orig.__lunaWrapped)return;const f=function(){const r=orig.apply(this,arguments);setTimeout(apply,0);return r};f.__lunaWrapped=true;window[name]=f;};
   window.addEventListener('DOMContentLoaded',()=>{apply();['renderHome','renderMenuGrid','renderCart','renderPromos','renderWellnessAndReviews'].forEach(wrap);setTimeout(apply,100);});setTimeout(apply,300);
+
+  /* v2 checkout flow fix: delivery data is collected on checkout, not on cart */
+  function setupCheckoutFlow(){
+    const cartDelivery=document.getElementById('delivery-field');
+    if(cartDelivery) cartDelivery.style.display='none';
+
+    const maps=document.getElementById('ck-maps-link');
+    if(!maps) return;
+
+    const field=maps.closest('.field');
+    if(field && !document.getElementById('ck-calc-delivery')){
+      const box=document.createElement('div');
+      box.id='ck-calc-delivery';
+      box.innerHTML='<button type="button" class="btn btn-outline btn-block" id="ck-calc-btn">Calculate delivery</button><p class="small-note" id="ck-calc-status" style="padding:8px 0 0;display:none;"></p><p class="small-note" id="ck-calc-error" style="padding:8px 0 0;color:var(--berry);display:none;"></p><div class="summary-box" id="ck-calc-result" style="display:none;margin:12px 0 0;"><div class="summary-row"><span>Delivery Distance</span><span id="ck-distance">—</span></div><div class="summary-row"><span>Delivery Fee</span><span id="ck-fee">—</span></div></div>';
+      field.insertAdjacentElement('afterend',box);
+      document.getElementById('ck-calc-btn').onclick=calculateCheckoutDelivery;
+    }
+
+    const info=document.getElementById('ck-delivery-info');
+    if(info) info.style.display='none';
+
+    const btn=document.getElementById('ck-confirm-btn');
+    if(btn){
+      btn.textContent='Order via WhatsApp';
+      btn.setAttribute('onclick','confirmOrderViaWhatsApp()');
+      btn.disabled=deliveryLoc && deliveryLoc.fee===null;
+      btn.style.opacity=btn.disabled?'0.55':'1';
+    }
+  }
+
+  async function calculateCheckoutDelivery(){
+    const link=(document.getElementById('ck-maps-link')?.value||'').trim();
+    const status=document.getElementById('ck-calc-status');
+    const err=document.getElementById('ck-calc-error');
+    const result=document.getElementById('ck-calc-result');
+    const btn=document.getElementById('ck-confirm-btn');
+    if(!status||!err||!result) return;
+
+    err.style.display='none';
+    status.style.display='block';
+    status.textContent='Calculating delivery fee…';
+    result.style.display='none';
+    if(btn){btn.disabled=true;btn.style.opacity='0.55';}
+
+    const coords=parseGoogleMapsCoordinates(link);
+    if(!coords){
+      status.style.display='none';
+      err.style.display='block';
+      err.textContent='Please paste a Google Maps link that contains a location pin with coordinates.';
+      return;
+    }
+
+    let distanceKm=null;
+    try{
+      distanceKm=await getRouteDistanceKm(DELIVERY_CONFIG.origin,coords);
+    }catch(e){ distanceKm=null; }
+
+    if(distanceKm===null){
+      status.style.display='none';
+      err.style.display='block';
+      err.textContent='Delivery distance could not be calculated. Please try another Google Maps link.';
+      return;
+    }
+
+    const billableKm=Math.ceil(distanceKm);
+    const fee=billableKm*DELIVERY_CONFIG.pricePerKm;
+    deliveryLoc={...deliveryLoc,mapsLink:link,lat:coords.latitude,lng:coords.longitude,distanceKm:billableKm,fee:fee};
+    status.style.display='none';
+    result.style.display='block';
+    document.getElementById('ck-distance').textContent=billableKm+' km';
+    document.getElementById('ck-fee').textContent=fmtPrice(fee);
+    const info=document.getElementById('ck-delivery-info');
+    if(info) info.style.display='none';
+    updateDeliverySummary();
+    if(btn){btn.disabled=false;btn.style.opacity='1';}
+  }
+
+  function cleanCheckoutBeforeOpen(){
+    const cartDelivery=document.getElementById('delivery-field');
+    if(cartDelivery) cartDelivery.style.display='none';
+    const oldStatus=document.getElementById('dlv-error');
+    const oldResult=document.getElementById('dlv-result');
+    if(oldStatus) oldStatus.style.display='none';
+    if(oldResult) oldResult.style.display='none';
+  }
+
+  window.goToCheckout=function(){
+    if(!cart || cart.length===0) return;
+    cleanCheckoutBeforeOpen();
+    const mapsLink=(document.getElementById('dlv-maps-link')?.value||deliveryLoc.mapsLink||'').trim();
+    const checkoutLink=document.getElementById('ck-maps-link');
+    if(checkoutLink) checkoutLink.value=mapsLink;
+    const name=document.getElementById('ck-name');
+    const phone=document.getElementById('ck-phone');
+    if(name) name.value=name.value||'';
+    if(phone) phone.value=phone.value||'';
+    const subtotal=document.getElementById('ck-subtotal');
+    if(subtotal) subtotal.textContent=fmtPrice(cartSubtotal());
+    const deliveryInfo=document.getElementById('ck-delivery-info');
+    if(deliveryInfo) deliveryInfo.style.display='none';
+    const confirm=document.getElementById('ck-confirm-btn');
+    if(confirm){
+      confirm.textContent='Order via WhatsApp';
+      confirm.setAttribute('onclick','confirmOrderViaWhatsApp()');
+      confirm.disabled=!(deliveryLoc && deliveryLoc.fee!==null && deliveryLoc.mapsLink===mapsLink);
+      confirm.style.opacity=confirm.disabled?'0.55':'1';
+    }
+    updateDeliverySummary();
+    showOrderSub('checkout');
+    setupCheckoutFlow();
+    translateText();
+  };
+
+  const originalConfirm=window.confirmOrderViaWhatsApp;
+  window.confirmOrderViaWhatsApp=function(){
+    const lang=state.lang;
+    const messages={
+      id:{name:'Silakan isi nama lengkap.',phone:'Silakan isi nomor WhatsApp.',maps:'Silakan isi link lokasi Google Maps.',fee:'Silakan hitung biaya delivery terlebih dahulu.',opening:'Membuka WhatsApp…'},
+      en:{name:'Please enter your full name.',phone:'Please enter your WhatsApp number.',maps:'Please enter your Google Maps location link.',fee:'Please calculate the delivery fee first.',opening:'Opening WhatsApp…'},
+      ru:{name:'Введите полное имя.',phone:'Введите номер WhatsApp.',maps:'Введите ссылку на Google Maps.',fee:'Сначала рассчитайте стоимость доставки.',opening:'Открываем WhatsApp…'},
+      vi:{name:'Vui lòng nhập họ tên.',phone:'Vui lòng nhập số WhatsApp.',maps:'Vui lòng nhập liên kết vị trí Google Maps.',fee:'Vui lòng tính phí giao hàng trước.',opening:'Đang mở WhatsApp…'}
+    }[lang]||null;
+    const name=(document.getElementById('ck-name')?.value||'').trim();
+    const phone=(document.getElementById('ck-phone')?.value||'').trim();
+    const link=(document.getElementById('ck-maps-link')?.value||'').trim();
+    if(!name){toast(messages?.name||'Please enter your full name.');return;}
+    if(!phone){toast(messages?.phone||'Please enter your WhatsApp number.');return;}
+    if(!link){toast(messages?.maps||'Please enter your Google Maps location link.');return;}
+    if(!deliveryLoc || deliveryLoc.fee===null){toast(messages?.fee||'Please calculate the delivery fee first.');return;}
+    if(typeof originalConfirm==='function') return originalConfirm.apply(this,arguments);
+  };
+
+  const originalApply=apply;
+  apply=function(){
+    originalApply();
+    setupCheckoutFlow();
+  };
+
 })();
