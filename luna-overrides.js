@@ -22,9 +22,17 @@
     if(field && !document.getElementById('ck-calc-delivery')){
       const box=document.createElement('div');
       box.id='ck-calc-delivery';
-      box.innerHTML='<button type="button" class="btn btn-outline btn-block" id="ck-calc-btn">Calculate delivery</button><p class="small-note" id="ck-calc-status" style="padding:8px 0 0;display:none;"></p><p class="small-note" id="ck-calc-error" style="padding:8px 0 0;color:var(--berry);display:none;"></p><div class="summary-box" id="ck-calc-result" style="display:none;margin:12px 0 0;"><div class="summary-row"><span>Delivery Distance</span><span id="ck-distance">—</span></div><div class="summary-row"><span>Delivery Fee</span><span id="ck-fee">—</span></div></div>';
+      box.innerHTML='<p class="small-note" id="ck-calc-status" style="padding:8px 0 0;display:none;"></p><p class="small-note" id="ck-calc-error" style="padding:8px 0 0;color:var(--berry);display:none;"></p><div class="summary-box" id="ck-calc-result" style="display:none;margin:12px 0 0;"><div class="summary-row"><span>Delivery Distance</span><span id="ck-distance">—</span></div><div class="summary-row"><span>Delivery Fee</span><span id="ck-fee">—</span></div></div>';
       field.insertAdjacentElement('afterend',box);
-      document.getElementById('ck-calc-btn').onclick=calculateCheckoutDelivery;
+      const mapInput=document.getElementById('ck-maps-link');
+      if(mapInput && !mapInput.dataset.autoDelivery){
+        mapInput.dataset.autoDelivery='1';
+        let timer;
+        const run=()=>{clearTimeout(timer);const value=mapInput.value.trim();if(value) timer=setTimeout(calculateCheckoutDelivery,350);};
+        mapInput.addEventListener('input',run);
+        mapInput.addEventListener('change',run);
+        mapInput.addEventListener('blur',run);
+      }
     }
 
     const info=document.getElementById('ck-delivery-info');
@@ -49,7 +57,7 @@
 
     err.style.display='none';
     status.style.display='block';
-    status.textContent='Calculating delivery fee…';
+    status.textContent='';
     result.style.display='none';
     if(btn){btn.disabled=true;btn.style.opacity='0.55';}
 
@@ -57,7 +65,7 @@
     if(!coords){
       status.style.display='none';
       err.style.display='block';
-      err.textContent='Please paste a Google Maps link that contains a location pin with coordinates.';
+      err.textContent='';
       return;
     }
 
