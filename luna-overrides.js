@@ -19,15 +19,23 @@
 }';document.head.appendChild(s);}
 
   function removeWellnessJournal(){
-    const headings=[...document.querySelectorAll('h1,h2,h3,h4')];
-    const heading=headings.find(el=>el.textContent.trim()==='Luna Wellness Journal');
-    if(!heading) return;
-    let section=heading.closest('section');
-    if(!section){
-      section=heading.parentElement;
-      while(section && section.parentElement && section.parentElement.children.length<=2) section=section.parentElement;
+    const carousel=document.getElementById('wellness-carousel');
+    if(carousel){
+      let node=carousel;
+      while(node.parentElement && node.parentElement.tagName!=='MAIN' && node.parentElement.tagName!=='BODY'){
+        node=node.parentElement;
+      }
+      if(node && node.parentElement) node.remove();
+      return;
     }
-    if(section) section.remove();
+    const heading=[...document.querySelectorAll('*')].find(el=>el.children.length===0 && el.textContent.trim()==='Luna Wellness Journal');
+    if(heading){
+      let node=heading;
+      while(node.parentElement && node.parentElement.tagName!=='MAIN' && node.parentElement.tagName!=='BODY'){
+        node=node.parentElement;
+      }
+      if(node && node.parentElement) node.remove();
+    }
   }
 
   function apply(){compactDeliveryOnly();addStyles();translateText();addCarouselControls('review-carousel','review-dots-override');addCarouselControls('wellness-carousel','wellness-dots-override');const sel=document.getElementById('language-select');if(sel){sel.value=state.lang;sel.onchange=()=>{state.lang=sel.value;localStorage.setItem('luna-language',state.lang);location.reload();};}document.querySelectorAll('.ph-tag').forEach(e=>{if(/Product image/i.test(e.textContent))e.textContent='Photo pending';});}
