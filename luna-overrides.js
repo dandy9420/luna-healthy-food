@@ -119,11 +119,26 @@
     result.style.display='none';
     if(btn){btn.disabled=true;btn.style.opacity='0.55';}
 
-    const coords=parseGoogleMapsCoordinates(link);
+    let coords=parseGoogleMapsCoordinates(link);
+
+    // Support normal Google Maps URLs and shortened maps.app.goo.gl links.
+    if(!coords){
+      try{
+        const response=await fetch('/.netlify/functions/resolve-maps',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({url:link})
+        });
+        const data=await response.json();
+        if(data?.latitude && data?.longitude){
+          coords={latitude:Number(data.latitude),longitude:Number(data.longitude)};
+        }
+      }catch(e){}
+    }
+
     if(!coords){
       status.style.display='none';
-      err.style.display='block';
-      err.textContent='';
+      err.style.display='none';
       return;
     }
 
@@ -134,8 +149,7 @@
 
     if(distanceKm===null){
       status.style.display='none';
-      err.style.display='block';
-      err.textContent='Delivery distance could not be calculated. Please try another Google Maps link.';
+      err.style.display='none';
       return;
     }
 
