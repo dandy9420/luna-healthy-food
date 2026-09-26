@@ -103,8 +103,25 @@
     if(btn){
       btn.textContent='Order via WhatsApp';
       btn.setAttribute('onclick','confirmOrderViaWhatsApp()');
-      btn.disabled=deliveryLoc && deliveryLoc.fee===null;
-      btn.style.opacity=btn.disabled?'0.55':'1';
+      // The customer must never be blocked by routing calculation.
+      // WhatsApp can be opened once the three required checkout fields are filled.
+      const refreshButton=()=>{
+        const name=(document.getElementById('ck-name')?.value||'').trim();
+        const phone=(document.getElementById('ck-phone')?.value||'').trim();
+        const link=(document.getElementById('ck-maps-link')?.value||'').trim();
+        const ready=!!(name&&phone&&link);
+        btn.disabled=!ready;
+        btn.style.opacity=ready?'1':'0.55';
+      };
+      ['ck-name','ck-phone','ck-maps-link'].forEach(id=>{
+        const el=document.getElementById(id);
+        if(el&&!el.dataset.whatsappReady){
+          el.dataset.whatsappReady='1';
+          el.addEventListener('input',refreshButton);
+          el.addEventListener('change',refreshButton);
+        }
+      });
+      refreshButton();
     }
   }
 
@@ -220,8 +237,34 @@
     if(!name){toast(messages?.name||'Please enter your full name.');return;}
     if(!phone){toast(messages?.phone||'Please enter your WhatsApp number.');return;}
     if(!link){toast(messages?.maps||'Please enter your Google Maps location link.');return;}
-    if(!deliveryLoc || deliveryLoc.fee===null){toast(messages?.fee||'Please calculate the delivery fee first.');return;}
-    if(typeof originalConfirm==='function') return originalConfirm.apply(this,arguments);
+    // Do not block the order because route calculation is unavailable.
+    // If delivery fee was calculated, include it. Otherwise WhatsApp can confirm it.
+    const subtotal=cartSubtotal();
+    const deliveryFee=(deliveryLoc && typeof deliveryLoc.fee==='number') ? deliveryLoc.fee : 0;
+    const discount=typeof getDiscount==='function' ? (getDiscount()||0) : 0;
+    const total=subtotal+deliveryFee-discount;
+    const lines=cart.map(item=>`${item.name} x ${item.qty} - ${fmtPrice(item.price*item.qty)}`).join('\\n');
+    const feeText=deliveryLoc && typeof deliveryLoc.fee==='number' ? fmtPrice(deliveryFee) : 'Akan dikonfirmasi';
+    const message=[
+      'Halo Luna Healthy Food,',
+      '',
+      'Saya ingin melakukan order delivery.',
+      `Nama: ${name}`,
+      `WhatsApp: ${phone}`,
+      `Lokasi Google Maps: ${link}`,
+      '',
+      'Pesanan:',
+      lines,
+      '',
+      `Subtotal: ${fmtPrice(subtotal)}`,
+      `Delivery Fee: ${feeText}`,
+      `Discount: ${fmtPrice(discount)}`,
+      `Total: ${fmtPrice(total)}`,
+      '',
+      'Mohon konfirmasi pesanan saya.',
+      'Terima kasih.'
+    ].join('\\n');
+    window.open('https://wa.me/628133991008?text='+encodeURIComponent(message),'_blank','noopener,noreferrer');
   };
 
   const originalApply=apply;
