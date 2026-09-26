@@ -90,6 +90,9 @@
         mapInput.addEventListener('input',run);
         mapInput.addEventListener('change',run);
         mapInput.addEventListener('blur',run);
+        // The checkout screen may already contain a Maps link when opened.
+        // Trigger delivery calculation immediately instead of waiting for another input event.
+        if(mapInput.value.trim()) setTimeout(run,100);
       }
     }
 
